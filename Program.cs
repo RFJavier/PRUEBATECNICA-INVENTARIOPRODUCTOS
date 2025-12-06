@@ -1,5 +1,5 @@
 
-namespace API.INVENTARIO
+namespace restapi.inventarios
 {
     public class Program
     {
@@ -22,6 +22,8 @@ namespace API.INVENTARIO
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+
+            app.UseHttpsRedirection();
 
             app.UseAuthorization();
 

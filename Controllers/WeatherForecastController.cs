@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace API.INVENTARIO.Controllers
+namespace restapi.inventarios.Controllers
 {
     [ApiController]
     [Route("[controller]")]

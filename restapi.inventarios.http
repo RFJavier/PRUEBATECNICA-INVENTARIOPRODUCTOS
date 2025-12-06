@@ -1,0 +1,6 @@
+@restapi.inventarios_HostAddress = http://localhost:5192
+
+GET {{restapi.inventarios_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
