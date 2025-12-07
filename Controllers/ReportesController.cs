@@ -8,7 +8,7 @@ namespace restapi.inventarios.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Operador,Admin")]
+    [Authorize(Roles = "Operador,Admin,Supervisor")]
     public class ReportesController : ControllerBase
     {
         private readonly VentasRepository _ventasRepo;

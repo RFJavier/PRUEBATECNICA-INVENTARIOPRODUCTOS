@@ -22,7 +22,7 @@ namespace restapi.inventarios.Controllers
         }
 
         [HttpGet("con-detalles")]
-        [Authorize(Roles = "Operador,Admin")]
+        [Authorize(Roles = "Operador,Admin,Supervisor")]
         public async Task<IActionResult> GetAllWithDetalles()
         {
             var rows = await _repo.GetAllWithDetallesAsync();
@@ -43,7 +43,7 @@ namespace restapi.inventarios.Controllers
         public record CreateReq(DateTime fecha, string vendedor, decimal total, List<DetalleReq> detalles);
 
         [HttpPost]
-        [Authorize(Roles = "Operador,Admin")]
+        [Authorize(Roles = "Operador,Admin,Supervisor")]
         public async Task<IActionResult> Create([FromBody] CreateReq req)
         {
             if (string.IsNullOrWhiteSpace(req.vendedor))
@@ -64,7 +64,7 @@ namespace restapi.inventarios.Controllers
         public record UpdateReq(DateTime fecha, string vendedor, decimal total, List<DetalleReq> detalles);
 
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Operador,Admin")]
+        [Authorize(Roles = "Operador,Admin,Supervisor")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateReq req)
         {
             if (string.IsNullOrWhiteSpace(req.vendedor))
@@ -82,7 +82,7 @@ namespace restapi.inventarios.Controllers
         }
 
         [HttpDelete("{id:int}")]
-        [Authorize(Roles = "Operador,Admin")]
+        [Authorize(Roles = "Operador,Admin,Supervisor")]
         public async Task<IActionResult> Delete(int id)
         {
             var deleted = await _repo.DeleteAsync(id);
