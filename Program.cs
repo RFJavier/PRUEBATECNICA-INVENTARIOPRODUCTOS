@@ -29,6 +29,12 @@ namespace WEBAPP
             builder.Services.AddScoped<Services.AuthState>();
             builder.Services.AddScoped<Services.AuthService>();
 
+            // Product service
+            builder.Services.AddScoped<Services.ProductoService>();
+
+            // Venta service
+            builder.Services.AddScoped<Services.VentaService>();
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.

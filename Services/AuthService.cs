@@ -18,7 +18,7 @@ public class AuthService
     }
 
     public record LoginRequest(string username, string password);
-    public record LoginResponse(string access_token, string token_type, int expires_in);
+    public record LoginResponse(string access_token, string token_type, int expires_in, string username, List<string> roles);
 
     public async Task<bool> LoginAsync(string username, string password)
     {
@@ -35,9 +35,11 @@ public class AuthService
         await _localStorage.SetAsync("auth.token", payload.access_token);
         await _localStorage.SetAsync("auth.tokenType", payload.token_type);
         await _localStorage.SetAsync("auth.expiresIn", payload.expires_in);
+        await _localStorage.SetAsync("auth.username", payload.username);
+        await _localStorage.SetAsync("auth.roles", payload.roles);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(payload.token_type, payload.access_token);
-        _state.SetAuthenticated(true);
+        _state.SetAuthenticated(true, payload.username, payload.roles);
         return true;
     }
 
@@ -45,7 +47,18 @@ public class AuthService
     {
         var result = await _localStorage.GetAsync<string>("auth.token");
         var token = result.Success ? result.Value : null;
-        _state.SetAuthenticated(!string.IsNullOrWhiteSpace(token));
+
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            var usernameResult = await _localStorage.GetAsync<string>("auth.username");
+            var rolesResult = await _localStorage.GetAsync<List<string>>("auth.roles");
+            _state.SetAuthenticated(true, usernameResult.Value, rolesResult.Value);
+        }
+        else
+        {
+            _state.SetAuthenticated(false);
+        }
+
         return token;
     }
 
@@ -54,6 +67,8 @@ public class AuthService
         await _localStorage.DeleteAsync("auth.token");
         await _localStorage.DeleteAsync("auth.tokenType");
         await _localStorage.DeleteAsync("auth.expiresIn");
+        await _localStorage.DeleteAsync("auth.username");
+        await _localStorage.DeleteAsync("auth.roles");
         _state.SetAuthenticated(false);
     }
 }
