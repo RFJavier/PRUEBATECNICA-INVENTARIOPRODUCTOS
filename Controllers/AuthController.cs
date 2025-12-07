@@ -56,7 +56,14 @@ namespace restapi.inventarios.Controllers
             _db.Sessions.Add(session);
             await _db.SaveChangesAsync();
 
-            return Ok(new { access_token = token, token_type = "Bearer", expires_in = (int)(expiresAt - DateTime.UtcNow).TotalSeconds });
+            return Ok(new
+            {
+                access_token = token,
+                token_type = "Bearer",
+                expires_in = (int)(expiresAt - DateTime.UtcNow).TotalSeconds,
+                username = user.Username,
+                roles
+            });
         }
 
         [HttpPost("register")]
