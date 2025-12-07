@@ -4,7 +4,7 @@
 ### Uso: Abrir en Visual Studio o VS Code con extensión REST Client
 ### ============================================================
 
-@baseUrl = https://localhost:32785
+@baseUrl = https://localhost:32789
 @contentType = application/json
 
 ### ============================================================
@@ -207,6 +207,52 @@ DELETE {{baseUrl}}/api/ventas/1
 Authorization: {{tokenVentas}}
 
 ### ============================================================
+### REPORTES - ReportesController
+### Roles: Operador, Admin
+### ============================================================
+
+@tokenReportes = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### Obtener información del reporte (sin descargar)
+### Respuesta exitosa (200): { "success": true, "message": "Reporte disponible con 15 ventas", "data": { "totalVentas": 15, "totalMonto": 5000.00, "promedioVenta": 333.33, ... } }
+GET {{baseUrl}}/api/reportes/ventas/info
+Authorization: {{tokenReportes}}
+
+###
+
+### Obtener información del reporte con filtro de fechas
+GET {{baseUrl}}/api/reportes/ventas/info?fechaInicio=2025-12-01&fechaFin=2025-12-31
+Authorization: {{tokenReportes}}
+
+###
+
+### Descargar reporte de ventas en Excel
+### Respuesta exitosa (200): Descarga archivo .xlsx
+### Error (404): { "success": false, "message": "No se encontraron ventas en el período especificado" }
+GET {{baseUrl}}/api/reportes/ventas/excel
+Authorization: {{tokenReportes}}
+
+###
+
+### Descargar reporte de ventas en Excel con filtro de fechas
+GET {{baseUrl}}/api/reportes/ventas/excel?fechaInicio=2025-12-01&fechaFin=2025-12-31
+Authorization: {{tokenReportes}}
+
+###
+
+### Descargar reporte de ventas en PDF
+### Respuesta exitosa (200): Descarga archivo .pdf
+### Error (404): { "success": false, "message": "No se encontraron ventas en el período especificado" }
+GET {{baseUrl}}/api/reportes/ventas/pdf
+Authorization: {{tokenReportes}}
+
+###
+
+### Descargar reporte de ventas en PDF con filtro de fechas
+GET {{baseUrl}}/api/reportes/ventas/pdf?fechaInicio=2025-12-01&fechaFin=2025-12-31
+Authorization: {{tokenReportes}}
+
+### ============================================================
 ### ROLES - RolesController
 ### Roles: Admin
 ### ============================================================
@@ -351,4 +397,15 @@ Authorization: {{tokenAdmin}}
 ###     "message": "Descripción del error",
 ###     "errors": ["error1", "error2"] // opcional
 ### }
+### ============================================================
+
+### ============================================================
+### PERMISOS DE ENDPOINTS REQUERIDOS EN BASE DE DATOS
+### ============================================================
+### Agregar estos registros a EndpointPermissions:
+### 
+### INSERT INTO EndpointPermissions (Route, HttpMethod, AllowedRolesCsv, IsEnabled) VALUES
+### ('/api/reportes/ventas/info', 'GET', 'Operador,Admin', 1),
+### ('/api/reportes/ventas/excel', 'GET', 'Operador,Admin', 1),
+### ('/api/reportes/ventas/pdf', 'GET', 'Operador,Admin', 1);
 ### ============================================================

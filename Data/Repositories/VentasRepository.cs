@@ -2,6 +2,7 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using restapi.inventarios.Entities;
+using restapi.inventarios.Services;
 
 namespace restapi.inventarios.Data.Repositories
 {
@@ -182,6 +183,71 @@ namespace restapi.inventarios.Data.Repositories
                 var detallesJson = reader.IsDBNull(reader.GetOrdinal("detalles")) ? "[]" : reader.GetString(reader.GetOrdinal("detalles"));
                 result.Add(new { idventa, fecha, vendedor, total, detalles = System.Text.Json.JsonSerializer.Deserialize<object>(detallesJson) });
             }
+            return result;
+        }
+
+        public async Task<List<VentaReporteItem>> GetAllWithDetallesForReportAsync(CancellationToken ct = default)
+        {
+            var result = new List<VentaReporteItem>();
+            await using var conn = _db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+
+            // Obtener encabezados
+            await using var cmdEnc = conn.CreateCommand();
+            cmdEnc.CommandText = @"
+                SELECT e.idventa, e.fecha, e.vendedor, e.total
+                FROM EncabezadoVentas e
+                ORDER BY e.fecha DESC";
+            cmdEnc.CommandType = CommandType.Text;
+
+            var ventasDict = new Dictionary<int, VentaReporteItem>();
+            await using (var reader = await cmdEnc.ExecuteReaderAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    var venta = new VentaReporteItem
+                    {
+                        IdVenta = reader.GetInt32(reader.GetOrdinal("idventa")),
+                        Fecha = reader.GetDateTime(reader.GetOrdinal("fecha")),
+                        Vendedor = reader.GetString(reader.GetOrdinal("vendedor")),
+                        Total = reader.GetDecimal(reader.GetOrdinal("total"))
+                    };
+                    ventasDict[venta.IdVenta] = venta;
+                    result.Add(venta);
+                }
+            }
+
+            if (result.Count == 0) return result;
+
+            // Obtener detalles con nombre de producto
+            await using var cmdDet = conn.CreateCommand();
+            cmdDet.CommandText = @"
+                SELECT d.idventa, d.idpro, p.producto, d.cantidad, d.precio, d.iva, d.total
+                FROM DetalleVentas d
+                LEFT JOIN Productos p ON d.idpro = p.idpro
+                ORDER BY d.idventa";
+            cmdDet.CommandType = CommandType.Text;
+
+            await using (var reader = await cmdDet.ExecuteReaderAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    var idventa = reader.GetInt32(reader.GetOrdinal("idventa"));
+                    if (ventasDict.TryGetValue(idventa, out var venta))
+                    {
+                        venta.Detalles.Add(new DetalleReporteItem
+                        {
+                            IdProducto = reader.GetInt32(reader.GetOrdinal("idpro")),
+                            NombreProducto = reader.IsDBNull(reader.GetOrdinal("producto")) ? null : reader.GetString(reader.GetOrdinal("producto")),
+                            Cantidad = reader.GetInt32(reader.GetOrdinal("cantidad")),
+                            Precio = reader.GetDecimal(reader.GetOrdinal("precio")),
+                            Iva = reader.GetDecimal(reader.GetOrdinal("iva")),
+                            Total = reader.GetDecimal(reader.GetOrdinal("total"))
+                        });
+                    }
+                }
+            }
+
             return result;
         }
     }

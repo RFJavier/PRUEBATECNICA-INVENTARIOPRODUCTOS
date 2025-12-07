@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using restapi.inventarios.Data;
 using restapi.inventarios.Data.Repositories;
+using restapi.inventarios.Services;
 using Microsoft.OpenApi.Models;
 
 namespace restapi.inventarios
@@ -26,10 +27,12 @@ namespace restapi.inventarios
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
-            // Repo productos (SP)
+            // Repositorios
             builder.Services.AddScoped<ProductoRepository>();
-            // Repo ventas (SP)
             builder.Services.AddScoped<VentasRepository>();
+
+            // Servicios
+            builder.Services.AddScoped<ReportesService>();
 
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
