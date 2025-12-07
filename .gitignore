@@ -417,3 +417,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 docker-compose.yml
+restapi.inventarios.http
