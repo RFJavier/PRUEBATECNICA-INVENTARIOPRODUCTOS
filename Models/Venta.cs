@@ -3,9 +3,25 @@ namespace WEBAPP.Models;
 public class Venta
 {
     public int Id { get; set; }
+    public int Idventa { get; set; }
     public DateTime Fecha { get; set; }
     public string Vendedor { get; set; } = string.Empty;
     public decimal Total { get; set; }
+    public List<DetalleVenta> Detalles { get; set; } = new();
+}
+
+public class VentaConDetalles
+{
+    public int Idventa { get; set; }
+    public DateTime Fecha { get; set; }
+    public string Vendedor { get; set; } = string.Empty;
+    public decimal Total { get; set; }
+    public List<DetalleVenta> Detalles { get; set; } = new();
+}
+
+public class VentaDetalle
+{
+    public Venta Encabezado { get; set; } = new();
     public List<DetalleVenta> Detalles { get; set; } = new();
 }
 
@@ -36,4 +52,9 @@ public class DetalleVentaRequest
     public decimal Precio { get; set; }
     public decimal Iva { get; set; }
     public decimal Total { get; set; }
+}
+
+public class VentaCreateResponse
+{
+    public int Id { get; set; }
 }

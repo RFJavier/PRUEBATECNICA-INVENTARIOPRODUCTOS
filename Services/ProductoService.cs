@@ -26,37 +26,55 @@ public class ProductoService
         return client;
     }
 
-    public async Task<List<Producto>> GetAllAsync()
+    public async Task<(List<Producto> Data, string Message)> GetAllAsync()
     {
         var client = await GetAuthenticatedClientAsync();
-        var result = await client.GetFromJsonAsync<List<Producto>>("/api/productos");
-        return result ?? new();
+        var response = await client.GetFromJsonAsync<ApiResponse<List<Producto>>>("/api/productos");
+        return (response?.Data ?? new(), response?.Message ?? string.Empty);
     }
 
-    public async Task<Producto?> GetByIdAsync(int id)
+    public async Task<(Producto? Data, string Message)> GetByIdAsync(int id)
     {
         var client = await GetAuthenticatedClientAsync();
-        return await client.GetFromJsonAsync<Producto>($"/api/productos/{id}");
+        var response = await client.GetFromJsonAsync<ApiResponse<Producto>>($"/api/productos/{id}");
+        return (response?.Data, response?.Message ?? string.Empty);
     }
 
-    public async Task<bool> CreateAsync(ProductoRequest producto)
+    public async Task<(List<Producto> Data, string Message)> BuscarPorCodigoAsync(string codigo)
     {
         var client = await GetAuthenticatedClientAsync();
-        var response = await client.PostAsJsonAsync("/api/productos", producto);
-        return response.IsSuccessStatusCode;
+        var response = await client.GetFromJsonAsync<ApiResponse<List<Producto>>>($"/api/productos/buscar?codigo={Uri.EscapeDataString(codigo)}");
+        return (response?.Data ?? new(), response?.Message ?? string.Empty);
     }
 
-    public async Task<bool> UpdateAsync(int id, ProductoRequest producto)
+    public async Task<(Producto? Data, string Message)> BuscarExactoPorCodigoAsync(string codigo)
     {
         var client = await GetAuthenticatedClientAsync();
-        var response = await client.PutAsJsonAsync($"/api/productos/{id}", producto);
-        return response.IsSuccessStatusCode;
+        var response = await client.GetFromJsonAsync<ApiResponse<Producto>>($"/api/productos/buscar-exacto?codigo={Uri.EscapeDataString(codigo)}");
+        return (response?.Data, response?.Message ?? string.Empty);
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<(bool Success, string Message, Producto? Data)> CreateAsync(ProductoRequest producto)
     {
         var client = await GetAuthenticatedClientAsync();
-        var response = await client.DeleteAsync($"/api/productos/{id}");
-        return response.IsSuccessStatusCode;
+        var httpResponse = await client.PostAsJsonAsync("/api/productos", producto);
+        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse<Producto>>();
+        return (response?.Success ?? false, response?.Message ?? "Error desconocido", response?.Data);
+    }
+
+    public async Task<(bool Success, string Message)> UpdateAsync(int id, ProductoRequest producto)
+    {
+        var client = await GetAuthenticatedClientAsync();
+        var httpResponse = await client.PutAsJsonAsync($"/api/productos/{id}", producto);
+        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse>();
+        return (response?.Success ?? false, response?.Message ?? "Error desconocido");
+    }
+
+    public async Task<(bool Success, string Message)> DeleteAsync(int id)
+    {
+        var client = await GetAuthenticatedClientAsync();
+        var httpResponse = await client.DeleteAsync($"/api/productos/{id}");
+        var response = await httpResponse.Content.ReadFromJsonAsync<ApiResponse>();
+        return (response?.Success ?? false, response?.Message ?? "Error desconocido");
     }
 }

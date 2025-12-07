@@ -1,0 +1,274 @@
+@page "/roles"
+@inject WEBAPP.Services.RoleService RoleService
+@inject WEBAPP.Services.AuthState State
+
+<PageTitle>Gestión de Roles</PageTitle>
+
+@if (!State.IsInRole("Admin"))
+{
+    <div class="alert alert-danger">No tienes permisos para acceder a esta sección.</div>
+}
+else
+{
+    <div class="container-fluid">
+        <!-- Notificación Toast -->
+        @if (showNotification)
+        {
+            <div class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+                <div class="toast show @(notificationType == "success" ? "bg-success" : "bg-danger") text-white">
+                    <div class="toast-header @(notificationType == "success" ? "bg-success" : "bg-danger") text-white">
+                        <strong class="me-auto">@(notificationType == "success" ? "? Éxito" : "? Error")</strong>
+                        <button type="button" class="btn-close btn-close-white" @onclick="() => showNotification = false"></button>
+                    </div>
+                    <div class="toast-body">
+                        @notificationMessage
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">Gestión de Roles</h3>
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-lg"></i> Nuevo Rol
+            </button>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        }
+        else if (roles.Count == 0)
+        {
+            <div class="alert alert-info">No hay roles registrados.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in roles)
+                        {
+                            <tr>
+                                <td>@r.Id</td>
+                                <td><span class="badge bg-primary">@r.Name</span></td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(r)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <!-- Modal Crear -->
+    @if (showModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nuevo Rol</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del Rol</label>
+                            <input class="form-control" @bind="formName" placeholder="Ej: Supervisor" />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" @onclick="SaveRole" disabled="@isSaving">
+                            @(isSaving ? "Guardando..." : "Guardar")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal Confirmar Eliminar -->
+    @if (showDeleteModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">?? Confirmar Eliminación</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="CloseDeleteModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Estás seguro de que deseas eliminar el rol <strong>@roleToDelete?.Name</strong>?</p>
+                        <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseDeleteModal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" @onclick="DeleteRole" disabled="@isDeleting">
+                            @(isDeleting ? "Eliminando..." : "Sí, Eliminar")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<WEBAPP.Models.Role> roles = new();
+    private bool isLoading = true;
+
+    // Notification
+    private bool showNotification;
+    private string notificationMessage = string.Empty;
+    private string notificationType = "success";
+
+    // Modal state
+    private bool showModal;
+    private string formName = string.Empty;
+    private bool isSaving;
+
+    // Delete modal
+    private bool showDeleteModal;
+    private WEBAPP.Models.Role? roleToDelete;
+    private bool isDeleting;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadRoles();
+            StateHasChanged();
+        }
+    }
+
+    private void ShowNotification(string message, string type = "success")
+    {
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        _ = HideNotificationAfterDelay();
+    }
+
+    private async Task HideNotificationAfterDelay()
+    {
+        await Task.Delay(4000);
+        showNotification = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadRoles()
+    {
+        isLoading = true;
+        try
+        {
+            var (data, message) = await RoleService.GetAllAsync();
+            roles = data;
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error al cargar roles: " + ex.Message, "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        formName = string.Empty;
+        showModal = true;
+    }
+
+    private void CloseModal() => showModal = false;
+
+    private async Task SaveRole()
+    {
+        if (string.IsNullOrWhiteSpace(formName))
+        {
+            ShowNotification("El nombre del rol es requerido.", "error");
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var (success, message, data) = await RoleService.CreateAsync(new WEBAPP.Models.RoleRequest { Name = formName });
+            if (success)
+            {
+                CloseModal();
+                await LoadRoles();
+                ShowNotification(message);
+            }
+            else
+            {
+                ShowNotification(message, "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error: " + ex.Message, "error");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete(WEBAPP.Models.Role r)
+    {
+        roleToDelete = r;
+        showDeleteModal = true;
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        roleToDelete = null;
+    }
+
+    private async Task DeleteRole()
+    {
+        if (roleToDelete is null) return;
+
+        isDeleting = true;
+        try
+        {
+            var (success, message) = await RoleService.DeleteAsync(roleToDelete.Id);
+            if (success)
+            {
+                CloseDeleteModal();
+                await LoadRoles();
+                ShowNotification(message);
+            }
+            else
+            {
+                ShowNotification(message, "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error: " + ex.Message, "error");
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

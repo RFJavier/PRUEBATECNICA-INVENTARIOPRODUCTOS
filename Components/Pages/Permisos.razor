@@ -1,11 +1,10 @@
-@page "/productos"
-@inject WEBAPP.Services.ProductoService ProductoService
+@page "/permisos"
+@inject WEBAPP.Services.EndpointPermissionService PermissionService
 @inject WEBAPP.Services.AuthState State
-@inject NavigationManager Nav
 
-<PageTitle>Productos</PageTitle>
+<PageTitle>Permisos de Endpoints</PageTitle>
 
-@if (!State.IsInRole("Admin", "Bodeguero"))
+@if (!State.IsInRole("Admin"))
 {
     <div class="alert alert-danger">No tienes permisos para acceder a esta sección.</div>
 }
@@ -29,21 +28,10 @@ else
         }
 
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h3 class="mb-0">Productos</h3>
-            <div>
-                <div class="input-group">
-                    <input class="form-control" placeholder="Buscar por código..." @bind="searchCodigo" @bind:event="oninput" />
-                    <button class="btn btn-outline-secondary" @onclick="SearchProductos">
-                        <i class="bi bi-search"></i>
-                    </button>
-                    <button class="btn btn-outline-secondary" @onclick="ClearSearch">
-                        <i class="bi bi-x"></i>
-                    </button>
-                    <button class="btn btn-primary" @onclick="ShowCreateModal">
-                        <i class="bi bi-plus-lg"></i> Nuevo
-                    </button>
-                </div>
-            </div>
+            <h3 class="mb-0">Permisos de Endpoints</h3>
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-lg"></i> Nuevo Permiso
+            </button>
         </div>
 
         @if (isLoading)
@@ -54,9 +42,9 @@ else
                 </div>
             </div>
         }
-        else if (productos.Count == 0)
+        else if (permissions.Count == 0)
         {
-            <div class="alert alert-info">No hay productos registrados.</div>
+            <div class="alert alert-info">No hay permisos configurados.</div>
         }
         else
         {
@@ -65,20 +53,38 @@ else
                     <thead class="table-dark">
                         <tr>
                             <th>ID</th>
-                            <th>Código</th>
-                            <th>Nombre</th>
-                            <th>Precio</th>
+                            <th>Ruta</th>
+                            <th>Método</th>
+                            <th>Roles Permitidos</th>
+                            <th>Estado</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var p in productos)
+                        @foreach (var p in permissions)
                         {
                             <tr>
                                 <td>@p.Id</td>
-                                <td><code>@p.Codigo</code></td>
-                                <td>@p.Nombre</td>
-                                <td>@p.Precio.ToString("C2")</td>
+                                <td><code>@p.Route</code></td>
+                                <td>
+                                    <span class="badge @GetMethodBadgeClass(p.HttpMethod)">@p.HttpMethod</span>
+                                </td>
+                                <td>
+                                    @foreach (var role in p.AllowedRolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        <span class="badge bg-secondary me-1">@role.Trim()</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (p.IsEnabled)
+                                    {
+                                        <span class="badge bg-success">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Inactivo</span>
+                                    }
+                                </td>
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowEditModal(p)">
                                         <i class="bi bi-pencil"></i>
@@ -102,26 +108,38 @@ else
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">@(isEditing ? "Editar Producto" : "Nuevo Producto")</h5>
+                        <h5 class="modal-title">@(isEditing ? "Editar Permiso" : "Nuevo Permiso")</h5>
                         <button type="button" class="btn-close" @onclick="CloseModal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Código</label>
-                            <input class="form-control" @bind="formCodigo" placeholder="Ej: ABC123" />
+                            <label class="form-label">Ruta</label>
+                            <input class="form-control" @bind="formRoute" placeholder="Ej: /api/productos" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Nombre del Producto</label>
-                            <input class="form-control" @bind="formProducto" placeholder="Ej: LAPICERO BIC" />
+                            <label class="form-label">Método HTTP</label>
+                            <select class="form-select" @bind="formHttpMethod">
+                                <option value="">-- Seleccione --</option>
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                            </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Precio</label>
-                            <input class="form-control" type="number" step="0.01" @bind="formPrecio" />
+                            <label class="form-label">Roles Permitidos (separados por coma)</label>
+                            <input class="form-control" @bind="formAllowedRoles" placeholder="Ej: Admin,Bodeguero" />
+                            <small class="text-muted">Use * para permitir todos los roles</small>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" @bind="formIsEnabled" id="isEnabledCheck" />
+                            <label class="form-check-label" for="isEnabledCheck">Habilitado</label>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancelar</button>
-                        <button type="button" class="btn btn-primary" @onclick="SaveProducto" disabled="@isSaving">
+                        <button type="button" class="btn btn-primary" @onclick="SavePermission" disabled="@isSaving">
                             @(isSaving ? "Guardando..." : "Guardar")
                         </button>
                     </div>
@@ -141,12 +159,11 @@ else
                         <button type="button" class="btn-close btn-close-white" @onclick="CloseDeleteModal"></button>
                     </div>
                     <div class="modal-body">
-                        <p>¿Estás seguro de que deseas eliminar el producto <strong>@productoToDelete?.Nombre</strong>?</p>
-                        <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                        <p>¿Estás seguro de que deseas eliminar el permiso para <strong>@permissionToDelete?.HttpMethod @permissionToDelete?.Route</strong>?</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" @onclick="CloseDeleteModal">Cancelar</button>
-                        <button type="button" class="btn btn-danger" @onclick="DeleteProducto" disabled="@isDeleting">
+                        <button type="button" class="btn btn-danger" @onclick="DeletePermission" disabled="@isDeleting">
                             @(isDeleting ? "Eliminando..." : "Sí, Eliminar")
                         </button>
                     </div>
@@ -157,9 +174,8 @@ else
 }
 
 @code {
-    private List<WEBAPP.Models.Producto> productos = new();
+    private List<WEBAPP.Models.EndpointPermission> permissions = new();
     private bool isLoading = true;
-    private string searchCodigo = string.Empty;
 
     // Notification
     private bool showNotification;
@@ -170,24 +186,35 @@ else
     private bool showModal;
     private bool isEditing;
     private int editingId;
-    private string formCodigo = string.Empty;
-    private string formProducto = string.Empty;
-    private decimal formPrecio;
+    private string formRoute = string.Empty;
+    private string formHttpMethod = string.Empty;
+    private string formAllowedRoles = string.Empty;
+    private bool formIsEnabled = true;
     private bool isSaving;
 
-    // Delete modal state
+    // Delete modal
     private bool showDeleteModal;
-    private WEBAPP.Models.Producto? productoToDelete;
+    private WEBAPP.Models.EndpointPermission? permissionToDelete;
     private bool isDeleting;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await LoadProductos();
+            await LoadPermissions();
             StateHasChanged();
         }
     }
+
+    private string GetMethodBadgeClass(string method) => method.ToUpper() switch
+    {
+        "GET" => "bg-info",
+        "POST" => "bg-success",
+        "PUT" => "bg-warning text-dark",
+        "DELETE" => "bg-danger",
+        "PATCH" => "bg-secondary",
+        _ => "bg-dark"
+    };
 
     private void ShowNotification(string message, string type = "success")
     {
@@ -204,111 +231,74 @@ else
         StateHasChanged();
     }
 
-    private async Task LoadProductos()
+    private async Task LoadPermissions()
     {
         isLoading = true;
         try
         {
-            var (data, message) = await ProductoService.GetAllAsync();
-            productos = data;
+            var (data, message) = await PermissionService.GetAllAsync();
+            permissions = data;
         }
         catch (Exception ex)
         {
-            ShowNotification("Error al cargar productos: " + ex.Message, "error");
+            ShowNotification("Error al cargar permisos: " + ex.Message, "error");
         }
         finally
         {
             isLoading = false;
         }
-    }
-
-    private async Task SearchProductos()
-    {
-        if (string.IsNullOrWhiteSpace(searchCodigo))
-        {
-            await LoadProductos();
-            return;
-        }
-
-        isLoading = true;
-        try
-        {
-            var (data, message) = await ProductoService.BuscarPorCodigoAsync(searchCodigo);
-            productos = data;
-            if (productos.Count == 0)
-            {
-                ShowNotification("No se encontraron productos con ese código", "error");
-            }
-        }
-        catch (Exception ex)
-        {
-            ShowNotification("Error en búsqueda: " + ex.Message, "error");
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
-
-    private async Task ClearSearch()
-    {
-        searchCodigo = string.Empty;
-        await LoadProductos();
     }
 
     private void ShowCreateModal()
     {
         isEditing = false;
         editingId = 0;
-        formCodigo = string.Empty;
-        formProducto = string.Empty;
-        formPrecio = 0;
+        formRoute = string.Empty;
+        formHttpMethod = string.Empty;
+        formAllowedRoles = string.Empty;
+        formIsEnabled = true;
         showModal = true;
     }
 
-    private void ShowEditModal(WEBAPP.Models.Producto p)
+    private void ShowEditModal(WEBAPP.Models.EndpointPermission p)
     {
         isEditing = true;
         editingId = p.Id;
-        formCodigo = p.Codigo;
-        formProducto = p.Nombre;
-        formPrecio = p.Precio;
+        formRoute = p.Route;
+        formHttpMethod = p.HttpMethod;
+        formAllowedRoles = p.AllowedRolesCsv;
+        formIsEnabled = p.IsEnabled;
         showModal = true;
     }
 
     private void CloseModal() => showModal = false;
 
-    private async Task SaveProducto()
+    private async Task SavePermission()
     {
-        if (string.IsNullOrWhiteSpace(formCodigo))
+        if (string.IsNullOrWhiteSpace(formRoute) || string.IsNullOrWhiteSpace(formHttpMethod))
         {
-            ShowNotification("El código es requerido.", "error");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(formProducto))
-        {
-            ShowNotification("El nombre del producto es requerido.", "error");
+            ShowNotification("Ruta y método HTTP son requeridos.", "error");
             return;
         }
 
         isSaving = true;
         try
         {
-            var request = new WEBAPP.Models.ProductoRequest 
-            { 
-                Codigo = formCodigo, 
-                Producto = formProducto, 
-                Precio = formPrecio 
+            var request = new WEBAPP.Models.EndpointPermissionRequest
+            {
+                Route = formRoute,
+                HttpMethod = formHttpMethod,
+                AllowedRolesCsv = formAllowedRoles,
+                IsEnabled = formIsEnabled
             };
 
             if (isEditing)
             {
-                var (success, message) = await ProductoService.UpdateAsync(editingId, request);
+                var (success, message, data) = await PermissionService.UpdateAsync(editingId, request);
                 if (success)
                 {
                     CloseModal();
-                    await LoadProductos();
+                    await LoadPermissions();
                     ShowNotification(message);
                 }
                 else
@@ -318,11 +308,11 @@ else
             }
             else
             {
-                var (success, message, data) = await ProductoService.CreateAsync(request);
+                var (success, message, data) = await PermissionService.CreateAsync(request);
                 if (success)
                 {
                     CloseModal();
-                    await LoadProductos();
+                    await LoadPermissions();
                     ShowNotification(message);
                 }
                 else
@@ -341,30 +331,30 @@ else
         }
     }
 
-    private void ConfirmDelete(WEBAPP.Models.Producto p)
+    private void ConfirmDelete(WEBAPP.Models.EndpointPermission p)
     {
-        productoToDelete = p;
+        permissionToDelete = p;
         showDeleteModal = true;
     }
 
     private void CloseDeleteModal()
     {
         showDeleteModal = false;
-        productoToDelete = null;
+        permissionToDelete = null;
     }
 
-    private async Task DeleteProducto()
+    private async Task DeletePermission()
     {
-        if (productoToDelete is null) return;
+        if (permissionToDelete is null) return;
 
         isDeleting = true;
         try
         {
-            var (success, message) = await ProductoService.DeleteAsync(productoToDelete.Id);
+            var (success, message) = await PermissionService.DeleteAsync(permissionToDelete.Id);
             if (success)
             {
                 CloseDeleteModal();
-                await LoadProductos();
+                await LoadPermissions();
                 ShowNotification(message);
             }
             else

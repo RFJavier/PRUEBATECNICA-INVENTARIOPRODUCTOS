@@ -29,11 +29,12 @@ namespace WEBAPP
             builder.Services.AddScoped<Services.AuthState>();
             builder.Services.AddScoped<Services.AuthService>();
 
-            // Product service
+            // Business services
             builder.Services.AddScoped<Services.ProductoService>();
-
-            // Venta service
             builder.Services.AddScoped<Services.VentaService>();
+            builder.Services.AddScoped<Services.RoleService>();
+            builder.Services.AddScoped<Services.UserService>();
+            builder.Services.AddScoped<Services.EndpointPermissionService>();
 
             var app = builder.Build();
 

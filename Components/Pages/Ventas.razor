@@ -66,7 +66,7 @@ else
                         @foreach (var v in ventas)
                         {
                             <tr>
-                                <td>@v.Id</td>
+                                <td>@v.Idventa</td>
                                 <td>@v.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                                 <td>@v.Vendedor</td>
                                 <td>@v.Total.ToString("C2")</td>
@@ -133,7 +133,7 @@ else
                                             <th>Producto</th>
                                             <th style="width:100px;">Cantidad</th>
                                             <th style="width:120px;">Precio Unit.</th>
-                                            <th style="width:100px;">IVA (12%)</th>
+                                            <th style="width:100px;">IVA</th>
                                             <th style="width:120px;">Subtotal</th>
                                             <th style="width:50px;"></th>
                                         </tr>
@@ -149,7 +149,7 @@ else
                                                         <option value="0">-- Seleccione --</option>
                                                         @foreach (var p in productos)
                                                         {
-                                                            <option value="@p.Id">@p.Producto1</option>
+                                                            <option value="@p.Id">@p.Nombre (@p.Codigo)</option>
                                                         }
                                                     </select>
                                                 </td>
@@ -208,7 +208,7 @@ else
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Detalle de Venta #@viewingVenta?.Id</h5>
+                        <h5 class="modal-title">Detalle de Venta #@viewingVenta?.Idventa</h5>
                         <button type="button" class="btn-close" @onclick="CloseViewModal"></button>
                     </div>
                     <div class="modal-body">
@@ -230,7 +230,7 @@ else
                             <table class="table table-sm">
                                 <thead>
                                     <tr>
-                                        <th>Producto ID</th>
+                                        <th>Producto</th>
                                         <th>Cantidad</th>
                                         <th>Precio</th>
                                         <th>IVA</th>
@@ -240,8 +240,9 @@ else
                                 <tbody>
                                     @foreach (var d in viewingVenta.Detalles)
                                     {
+                                        var prod = productos.FirstOrDefault(p => p.Id == d.Idpro);
                                         <tr>
-                                            <td>@(productos.FirstOrDefault(p => p.Id == d.Idpro)?.Producto1 ?? $"ID: {d.Idpro}")</td>
+                                            <td>@(prod?.Nombre ?? $"ID: {d.Idpro}")</td>
                                             <td>@d.Cantidad</td>
                                             <td>@d.Precio.ToString("C2")</td>
                                             <td>@d.Iva.ToString("C2")</td>
@@ -271,7 +272,7 @@ else
                         <button type="button" class="btn-close btn-close-white" @onclick="CloseDeleteModal"></button>
                     </div>
                     <div class="modal-body">
-                        <p>¿Estás seguro de que deseas eliminar la venta <strong>#@ventaToDelete?.Id</strong>?</p>
+                        <p>¿Estás seguro de que deseas eliminar la venta <strong>#@ventaToDelete?.Idventa</strong>?</p>
                         <p class="text-muted mb-0">Esta acción no se puede deshacer y eliminará todos los detalles asociados.</p>
                     </div>
                     <div class="modal-footer">
@@ -287,7 +288,7 @@ else
 }
 
 @code {
-    private List<WEBAPP.Models.Venta> ventas = new();
+    private List<WEBAPP.Models.VentaConDetalles> ventas = new();
     private List<WEBAPP.Models.Producto> productos = new();
     private bool isLoading = true;
 
@@ -307,11 +308,11 @@ else
 
     // View modal
     private bool showViewModal;
-    private WEBAPP.Models.Venta? viewingVenta;
+    private WEBAPP.Models.VentaConDetalles? viewingVenta;
 
     // Delete modal
     private bool showDeleteModal;
-    private WEBAPP.Models.Venta? ventaToDelete;
+    private WEBAPP.Models.VentaConDetalles? ventaToDelete;
     private bool isDeleting;
 
     private class DetalleForm
@@ -337,11 +338,11 @@ else
         isLoading = true;
         try
         {
-            var ventasTask = VentaService.GetAllAsync();
+            var ventasTask = VentaService.GetAllConDetallesAsync();
             var productosTask = ProductoService.GetAllAsync();
             await Task.WhenAll(ventasTask, productosTask);
-            ventas = ventasTask.Result;
-            productos = productosTask.Result;
+            ventas = ventasTask.Result.Data;
+            productos = productosTask.Result.Data;
         }
         catch (Exception ex)
         {
@@ -378,10 +379,10 @@ else
         showModal = true;
     }
 
-    private void ShowEditModal(WEBAPP.Models.Venta v)
+    private void ShowEditModal(WEBAPP.Models.VentaConDetalles v)
     {
         isEditing = true;
-        editingId = v.Id;
+        editingId = v.Idventa;
         formFecha = v.Fecha;
         formVendedor = v.Vendedor;
         formDetalles = v.Detalles.Select(d => new DetalleForm
@@ -397,7 +398,7 @@ else
 
     private void CloseModal() => showModal = false;
 
-    private void ShowViewModal(WEBAPP.Models.Venta v)
+    private void ShowViewModal(WEBAPP.Models.VentaConDetalles v)
     {
         viewingVenta = v;
         showViewModal = true;
@@ -433,7 +434,7 @@ else
     private void CalcularDetalle(DetalleForm det)
     {
         var subtotal = det.Cantidad * det.Precio;
-        det.Iva = Math.Round(subtotal * 0.12m, 2);
+        det.Iva = Math.Round(subtotal * 0.13m, 2);
         det.Total = Math.Round(subtotal + det.Iva, 2);
     }
 
@@ -476,25 +477,33 @@ else
                     }).ToList()
             };
 
-            bool success;
             if (isEditing)
             {
-                success = await VentaService.UpdateAsync(editingId, request);
+                var (success, message) = await VentaService.UpdateAsync(editingId, request);
+                if (success)
+                {
+                    CloseModal();
+                    await LoadData();
+                    ShowNotification(message);
+                }
+                else
+                {
+                    ShowNotification(message, "error");
+                }
             }
             else
             {
-                success = await VentaService.CreateAsync(request);
-            }
-
-            if (success)
-            {
-                CloseModal();
-                await LoadData();
-                ShowNotification(isEditing ? "Venta actualizada correctamente." : "Venta creada correctamente.");
-            }
-            else
-            {
-                ShowNotification("Error al guardar la venta.", "error");
+                var (success, message, id) = await VentaService.CreateAsync(request);
+                if (success)
+                {
+                    CloseModal();
+                    await LoadData();
+                    ShowNotification(message);
+                }
+                else
+                {
+                    ShowNotification(message, "error");
+                }
             }
         }
         catch (Exception ex)
@@ -507,7 +516,7 @@ else
         }
     }
 
-    private void ConfirmDelete(WEBAPP.Models.Venta v)
+    private void ConfirmDelete(WEBAPP.Models.VentaConDetalles v)
     {
         ventaToDelete = v;
         showDeleteModal = true;
@@ -526,16 +535,16 @@ else
         isDeleting = true;
         try
         {
-            var success = await VentaService.DeleteAsync(ventaToDelete.Id);
+            var (success, message) = await VentaService.DeleteAsync(ventaToDelete.Idventa);
             if (success)
             {
                 CloseDeleteModal();
                 await LoadData();
-                ShowNotification("Venta eliminada correctamente.");
+                ShowNotification(message);
             }
             else
             {
-                ShowNotification("Error al eliminar la venta.", "error");
+                ShowNotification(message, "error");
             }
         }
         catch (Exception ex)

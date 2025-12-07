@@ -48,15 +48,15 @@
         errorMessage = null;
         try
         {
-            var ok = await Auth.LoginAsync(username, password);
+            var (ok, message) = await Auth.LoginAsync(username, password);
             if (ok)
             {
                 Nav.NavigateTo("/home");
                 return;
             }
-            errorMessage = "Credenciales inválidas";
+            errorMessage = message;
         }
-        catch
+        catch (Exception)
         {
             errorMessage = "Ocurrió un error. Intenta nuevamente.";
         }
