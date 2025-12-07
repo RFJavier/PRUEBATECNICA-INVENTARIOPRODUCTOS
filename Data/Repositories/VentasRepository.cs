@@ -101,7 +101,7 @@ namespace restapi.inventarios.Data.Repositories
             await using var conn = _db.Database.GetDbConnection();
             if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "sp_Ventas_GetAll";
+            cmd.CommandText = "sp_Ventas_GetAll_Detalles";
             cmd.CommandType = CommandType.StoredProcedure;
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
@@ -122,6 +122,14 @@ namespace restapi.inventarios.Data.Repositories
             await using var conn = _db.Database.GetDbConnection();
             if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
 
+            // Verificar si existe en la misma conexión
+            await using var checkCmd = conn.CreateCommand();
+            checkCmd.CommandText = "SELECT COUNT(1) FROM EncabezadoVentas WHERE idventa = @idventa";
+            checkCmd.CommandType = CommandType.Text;
+            var pCheck = checkCmd.CreateParameter(); pCheck.ParameterName = "@idventa"; pCheck.Value = enc.Id; pCheck.DbType = DbType.Int32; checkCmd.Parameters.Add(pCheck);
+            var exists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync(ct)) > 0;
+            if (!exists) return false;
+
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "sp_Ventas_Update";
             cmd.CommandType = CommandType.StoredProcedure;
@@ -140,10 +148,40 @@ namespace restapi.inventarios.Data.Repositories
 
         public async Task<bool> DeleteAsync(int idventa, CancellationToken ct = default)
         {
-            var rows = await _db.Database.ExecuteSqlRawAsync(
-                "EXEC sp_Ventas_Delete @idventa",
-                new SqlParameter("@idventa", idventa));
-            return rows >= 0; // proc DELETE suele devolver -1
+            await using var conn = _db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "sp_Ventas_Delete";
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@idventa"; p1.Value = idventa; p1.DbType = DbType.Int32; cmd.Parameters.Add(p1);
+            var pRet = cmd.CreateParameter(); pRet.ParameterName = "@RETURN_VALUE"; pRet.Direction = ParameterDirection.ReturnValue; pRet.DbType = DbType.Int32; cmd.Parameters.Add(pRet);
+
+            await cmd.ExecuteNonQueryAsync(ct);
+            var estado = (pRet.Value is int i) ? i : Convert.ToInt32(pRet.Value);
+            return estado == 1;
+        }
+
+        public async Task<List<object>> GetAllWithDetallesAsync(CancellationToken ct = default)
+        {
+            var result = new List<object>();
+            await using var conn = _db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "sp_Ventas_GetAll_Detalles";
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                var idventa = reader.GetInt32(reader.GetOrdinal("idventa"));
+                var fecha = reader.GetDateTime(reader.GetOrdinal("fecha"));
+                var vendedor = reader.GetString(reader.GetOrdinal("vendedor"));
+                var total = reader.GetDecimal(reader.GetOrdinal("total"));
+                var detallesJson = reader.IsDBNull(reader.GetOrdinal("detalles")) ? "[]" : reader.GetString(reader.GetOrdinal("detalles"));
+                result.Add(new { idventa, fecha, vendedor, total, detalles = System.Text.Json.JsonSerializer.Deserialize<object>(detallesJson) });
+            }
+            return result;
         }
     }
 }

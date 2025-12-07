@@ -114,9 +114,28 @@ namespace restapi.inventarios
 
                 var route = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
                 var method = context.Request.Method.ToUpperInvariant();
-                using var scope = app.Services.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var perm = await db.EndpointPermissions.FirstOrDefaultAsync(e => e.Route.ToLower() == route && e.HttpMethod == method);
+                
+                // Usar el DbContext del scope de la request (no crear uno nuevo)
+                var db = context.RequestServices.GetRequiredService<AppDbContext>();
+
+                // Buscar permiso: primero coincidencia exacta, luego por prefijo (ruta base)
+                var perm = await db.EndpointPermissions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(e => e.Route.ToLower() == route && e.HttpMethod == method);
+
+                // Si no hay coincidencia exacta, buscar por ruta base (ej: /api/ventas para /api/ventas/123)
+                if (perm == null)
+                {
+                    var segments = route.TrimEnd('/').Split('/');
+                    if (segments.Length > 1 && int.TryParse(segments[^1], out _))
+                    {
+                        var baseRoute = string.Join("/", segments[..^1]);
+                        perm = await db.EndpointPermissions
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(e => e.Route.ToLower() == baseRoute && e.HttpMethod == method);
+                    }
+                }
+
                 if (perm == null || !perm.IsEnabled)
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;

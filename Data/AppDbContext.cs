@@ -26,6 +26,8 @@ namespace restapi.inventarios.Data
                 b.ToTable("Productos");
                 b.HasKey(p => p.Id);
                 b.Property(p => p.Id).HasColumnName("idpro");
+                b.Property(p => p.Codigo).HasColumnName("codigo").HasMaxLength(30).IsRequired();
+                b.HasIndex(p => p.Codigo).IsUnique();
                 b.Property(p => p.Nombre).HasColumnName("producto").HasMaxLength(200).IsRequired();
                 b.Property(p => p.Precio).HasColumnName("precio").HasColumnType("decimal(18,2)").IsRequired();
             });

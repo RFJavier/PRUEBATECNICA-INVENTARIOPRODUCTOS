@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using restapi.inventarios.Data;
 using restapi.inventarios.Security;
 using restapi.inventarios.Entities;
+using restapi.inventarios.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace restapi.inventarios.Controllers
@@ -31,19 +32,21 @@ namespace restapi.inventarios.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+                return BadRequest(ApiResponse.Fail("Usuario y contraseña son requeridos"));
+
             var user = await _db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
                                        .FirstOrDefaultAsync(u => u.Username == request.Username && u.IsActive);
             if (user is null)
-                return Unauthorized();
+                return Unauthorized(ApiResponse.Fail("Credenciales inválidas"));
 
             var valid = PasswordHasher.Verify(request.Password, user.PasswordSalt, user.PasswordHash);
             if (!valid)
-                return Unauthorized();
+                return Unauthorized(ApiResponse.Fail("Credenciales inválidas"));
 
             var roles = user.UserRoles.Select(ur => ur.Role!.Name).ToArray();
             var (token, jti, expiresAt) = CreateToken(user.Username, roles);
 
-            // Registrar sesión
             var session = new Session
             {
                 UserId = user.Id,
@@ -56,14 +59,14 @@ namespace restapi.inventarios.Controllers
             _db.Sessions.Add(session);
             await _db.SaveChangesAsync();
 
-            return Ok(new
+            return Ok(ApiResponse<object>.Ok(new
             {
                 access_token = token,
                 token_type = "Bearer",
                 expires_in = (int)(expiresAt - DateTime.UtcNow).TotalSeconds,
                 username = user.Username,
                 roles
-            });
+            }, "Inicio de sesión exitoso"));
         }
 
         [HttpPost("register")]
@@ -71,15 +74,16 @@ namespace restapi.inventarios.Controllers
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
-                return BadRequest("Usuario y contraseña requeridos");
+                return BadRequest(ApiResponse.Fail("Usuario y contraseña son requeridos"));
 
             var exists = await _db.Users.AnyAsync(u => u.Username == request.Username);
-            if (exists) return Conflict("Usuario ya existe");
+            if (exists)
+                return Conflict(ApiResponse.Fail("El usuario ya existe"));
 
             var salt = PasswordHasher.GenerateSalt();
             var hash = PasswordHasher.HashPassword(request.Password, salt);
 
-            var user = new User
+            var newUser = new Entities.User
             {
                 Username = request.Username,
                 PasswordSalt = salt,
@@ -88,18 +92,18 @@ namespace restapi.inventarios.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            _db.Users.Add(user);
+            _db.Users.Add(newUser);
             await _db.SaveChangesAsync();
 
-            // asignar rol por defecto "User" si existe
             var role = await _db.Roles.FirstOrDefaultAsync(r => r.Name == "User");
             if (role != null)
             {
-                _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
+                _db.UserRoles.Add(new UserRole { UserId = newUser.Id, RoleId = role.Id });
                 await _db.SaveChangesAsync();
             }
 
-            return CreatedAtAction(nameof(Login), new { username = user.Username }, new { user.Id, user.Username });
+            return CreatedAtAction(nameof(Login), new { username = newUser.Username }, 
+                ApiResponse<object>.Created(new { newUser.Id, newUser.Username }, "Usuario registrado exitosamente"));
         }
 
         private (string token, string jti, DateTime expiresAt) CreateToken(string username, IEnumerable<string> roles)

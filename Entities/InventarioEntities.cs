@@ -1,10 +1,11 @@
-namespace restapi.inventarios.Entities
+    namespace restapi.inventarios.Entities
 {
     public class Producto
     {
         public int Id { get; set; } // idpro
         public string Nombre { get; set; } = string.Empty; // producto
         public decimal Precio { get; set; } // precio
+        public string Codigo { get; set; } = string.Empty; // codigo
     }
 
     public class EncabezadoVenta

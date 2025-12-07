@@ -1,0 +1,354 @@
+### ============================================================
+### API REST Inventarios - Archivo de pruebas HTTP
+### ============================================================
+### Uso: Abrir en Visual Studio o VS Code con extensión REST Client
+### ============================================================
+
+@baseUrl = https://localhost:32785
+@contentType = application/json
+
+### ============================================================
+### AUTENTICACIÓN - AuthController
+### ============================================================
+
+### Login - Obtener token JWT
+### Respuesta exitosa (200): { "success": true, "message": "Inicio de sesión exitoso", "data": { "access_token": "...", "token_type": "Bearer", "expires_in": 3600, "username": "admin", "roles": ["Admin"] } }
+### Error (401): { "success": false, "message": "Credenciales inválidas" }
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+    "username": "admin",
+    "password": "admin123"
+}
+
+###
+
+### Registro de usuario
+### Respuesta exitosa (201): { "success": true, "message": "Usuario registrado exitosamente", "data": { "id": 1, "username": "nuevo_usuario" } }
+### Error (400): { "success": false, "message": "Usuario y contraseña son requeridos" }
+### Error (409): { "success": false, "message": "El usuario ya existe" }
+POST {{baseUrl}}/api/auth/register
+Content-Type: {{contentType}}
+
+{
+    "username": "nuevo_usuario",
+    "password": "password123"
+}
+
+### ============================================================
+### PRODUCTOS - ProductosController
+### Roles: Bodeguero, Admin
+### ============================================================
+
+@tokenProductos = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### Obtener todos los productos
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 5 productos", "data": [...] }
+GET {{baseUrl}}/api/productos
+Authorization: {{tokenProductos}}
+
+###
+
+### Obtener producto por ID
+### Respuesta exitosa (200): { "success": true, "message": "Producto encontrado", "data": { "id": 1, "codigo": "ABC123", "nombre": "Producto", "precio": 10.00 } }
+### Error (404): { "success": false, "message": "Producto con ID 999 no encontrado" }
+GET {{baseUrl}}/api/productos/1
+Authorization: {{tokenProductos}}
+
+###
+
+### Buscar productos por código (búsqueda parcial)
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 3 productos", "data": [...] }
+### Error (400): { "success": false, "message": "El parámetro 'codigo' es requerido" }
+GET {{baseUrl}}/api/productos/buscar?codigo=ABC
+Authorization: {{tokenProductos}}
+
+###
+
+### Buscar producto por código exacto
+### Respuesta exitosa (200): { "success": true, "message": "Producto encontrado", "data": { "id": 1, "codigo": "ABC123", "nombre": "Producto", "precio": 10.00 } }
+### Error (404): { "success": false, "message": "No se encontró producto con código 'XYZ'" }
+GET {{baseUrl}}/api/productos/buscar-exacto?codigo=ABC123
+Authorization: {{tokenProductos}}
+
+###
+
+### Crear producto
+### Respuesta exitosa (201): { "success": true, "message": "Producto creado exitosamente", "data": { "id": 5, "codigo": "NEW001", "producto": "Nuevo Producto", "precio": 25.50 } }
+### Error (400): { "success": false, "message": "El código es requerido" }
+POST {{baseUrl}}/api/productos
+Authorization: {{tokenProductos}}
+Content-Type: {{contentType}}
+
+{
+    "codigo": "NEW001",
+    "producto": "Nuevo Producto",
+    "precio": 25.50
+}
+
+###
+
+### Actualizar producto
+### Respuesta exitosa (200): { "success": true, "message": "Producto actualizado exitosamente" }
+### Error (404): { "success": false, "message": "Producto con ID 999 no encontrado" }
+### Error (400): { "success": false, "message": "El código es requerido" }
+PUT {{baseUrl}}/api/productos/1
+Authorization: {{tokenProductos}}
+Content-Type: {{contentType}}
+
+{
+    "codigo": "ABC123-UPD",
+    "producto": "Producto Actualizado",
+    "precio": 30.00
+}
+
+###
+
+### Eliminar producto
+### Respuesta exitosa (200): { "success": true, "message": "Producto eliminado exitosamente" }
+### Error (404): { "success": false, "message": "Producto con ID 999 no encontrado" }
+DELETE {{baseUrl}}/api/productos/1
+Authorization: {{tokenProductos}}
+
+### ============================================================
+### VENTAS - VentasController
+### Roles: Operador, Admin
+### ============================================================
+
+@tokenVentas = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### Obtener todas las ventas
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 10 ventas", "data": [...] }
+GET {{baseUrl}}/api/ventas
+Authorization: {{tokenVentas}}
+
+###
+
+### Obtener ventas con detalles (JSON anidado)
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 10 ventas con detalles", "data": [{ "idventa": 1, "fecha": "...", "vendedor": "...", "total": 100.00, "detalles": [...] }] }
+GET {{baseUrl}}/api/ventas/con-detalles
+Authorization: {{tokenVentas}}
+
+###
+
+### Obtener venta por ID
+### Respuesta exitosa (200): { "success": true, "message": "Venta encontrada", "data": { "encabezado": {...}, "detalles": [...] } }
+### Error (404): { "success": false, "message": "Venta con ID 999 no encontrada" }
+GET {{baseUrl}}/api/ventas/1
+Authorization: {{tokenVentas}}
+
+###
+
+### Crear venta
+### Respuesta exitosa (201): { "success": true, "message": "Venta creada exitosamente", "data": { "id": 5 } }
+### Error (400): { "success": false, "message": "El vendedor es requerido" }
+### Error (400): { "success": false, "message": "Debe incluir al menos un detalle de venta" }
+POST {{baseUrl}}/api/ventas
+Authorization: {{tokenVentas}}
+Content-Type: {{contentType}}
+
+{
+    "fecha": "2025-12-07T12:00:00",
+    "vendedor": "Juan Pérez",
+    "total": 150.00,
+    "detalles": [
+        {
+            "fecha": "2025-12-07T12:00:00",
+            "idpro": 1,
+            "cantidad": 5,
+            "precio": 10.00,
+            "iva": 8.00,
+            "total": 58.00
+        },
+        {
+            "fecha": "2025-12-07T12:00:00",
+            "idpro": 2,
+            "cantidad": 3,
+            "precio": 20.00,
+            "iva": 12.00,
+            "total": 72.00
+        }
+    ]
+}
+
+###
+
+### Actualizar venta
+### Respuesta exitosa (200): { "success": true, "message": "Venta actualizada exitosamente" }
+### Error (404): { "success": false, "message": "Venta con ID 999 no encontrada" }
+### Error (400): { "success": false, "message": "El vendedor es requerido" }
+PUT {{baseUrl}}/api/ventas/1
+Authorization: {{tokenVentas}}
+Content-Type: {{contentType}}
+
+{
+    "fecha": "2025-12-07T14:00:00",
+    "vendedor": "María García",
+    "total": 200.00,
+    "detalles": [
+        {
+            "fecha": "2025-12-07T14:00:00",
+            "idpro": 1,
+            "cantidad": 10,
+            "precio": 10.00,
+            "iva": 16.00,
+            "total": 116.00
+        }
+    ]
+}
+
+###
+
+### Eliminar venta
+### Respuesta exitosa (200): { "success": true, "message": "Venta eliminada exitosamente" }
+### Error (404): { "success": false, "message": "Venta con ID 999 no encontrada" }
+DELETE {{baseUrl}}/api/ventas/1
+Authorization: {{tokenVentas}}
+
+### ============================================================
+### ROLES - RolesController
+### Roles: Admin
+### ============================================================
+
+@tokenAdmin = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### Obtener todos los roles
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 3 roles", "data": [{ "id": 1, "name": "Admin" }, ...] }
+GET {{baseUrl}}/api/roles
+Authorization: {{tokenAdmin}}
+
+###
+
+### Crear rol
+### Respuesta exitosa (201): { "success": true, "message": "Rol creado exitosamente", "data": { "id": 4, "name": "Supervisor" } }
+### Error (400): { "success": false, "message": "Nombre del rol es requerido" }
+### Error (409): { "success": false, "message": "El rol 'Admin' ya existe" }
+POST {{baseUrl}}/api/roles
+Authorization: {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+    "name": "Supervisor"
+}
+
+###
+
+### Eliminar rol
+### Respuesta exitosa (200): { "success": true, "message": "Rol eliminado exitosamente" }
+### Error (404): { "success": false, "message": "Rol con ID 999 no encontrado" }
+DELETE {{baseUrl}}/api/roles/4
+Authorization: {{tokenAdmin}}
+
+### ============================================================
+### USUARIOS - UsersController
+### Roles: Admin
+### ============================================================
+
+### Obtener todos los usuarios
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 5 usuarios", "data": [{ "id": 1, "username": "admin", "isActive": true, "roles": ["Admin"] }, ...] }
+GET {{baseUrl}}/api/users
+Authorization: {{tokenAdmin}}
+
+###
+
+### Asignar rol a usuario
+### Respuesta exitosa (200): { "success": true, "message": "Rol 'Operador' asignado exitosamente al usuario 'juan'" }
+### Error (404): { "success": false, "message": "Usuario con ID 999 no encontrado" }
+### Error (400): { "success": false, "message": "El rol 'NoExiste' no existe" }
+### Error (409): { "success": false, "message": "El usuario ya tiene el rol 'Admin'" }
+POST {{baseUrl}}/api/users/1/roles
+Authorization: {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+"Operador"
+
+###
+
+### Remover rol de usuario
+### Respuesta exitosa (200): { "success": true, "message": "Rol 'Operador' removido exitosamente" }
+### Error (404): { "success": false, "message": "El rol 'NoExiste' no existe" }
+### Error (404): { "success": false, "message": "El usuario no tiene el rol 'Bodeguero'" }
+DELETE {{baseUrl}}/api/users/1/roles/Operador
+Authorization: {{tokenAdmin}}
+
+### ============================================================
+### PERMISOS DE ENDPOINTS - EndpointPermissionsController
+### Roles: Admin
+### ============================================================
+
+### Obtener todos los permisos
+### Respuesta exitosa (200): { "success": true, "message": "Se encontraron 20 permisos de endpoint", "data": [...] }
+GET {{baseUrl}}/api/endpointpermissions
+Authorization: {{tokenAdmin}}
+
+###
+
+### Crear permiso de endpoint
+### Respuesta exitosa (201): { "success": true, "message": "Permiso de endpoint creado exitosamente", "data": { "id": 25, "route": "/api/nuevo", "httpMethod": "GET", "allowedRolesCsv": "Admin", "isEnabled": true } }
+### Error (400): { "success": false, "message": "Route y HttpMethod son requeridos" }
+POST {{baseUrl}}/api/endpointpermissions
+Authorization: {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+    "route": "/api/nuevo-endpoint",
+    "httpMethod": "GET",
+    "allowedRolesCsv": "Admin,Operador",
+    "isEnabled": true
+}
+
+###
+
+### Actualizar permiso de endpoint
+### Respuesta exitosa (200): { "success": true, "message": "Permiso de endpoint actualizado exitosamente", "data": {...} }
+### Error (404): { "success": false, "message": "Permiso con ID 999 no encontrado" }
+PUT {{baseUrl}}/api/endpointpermissions/1
+Authorization: {{tokenAdmin}}
+Content-Type: {{contentType}}
+
+{
+    "route": "/api/productos",
+    "httpMethod": "GET",
+    "allowedRolesCsv": "Bodeguero,Admin,Operador",
+    "isEnabled": true
+}
+
+###
+
+### Eliminar permiso de endpoint
+### Respuesta exitosa (200): { "success": true, "message": "Permiso de endpoint eliminado exitosamente" }
+### Error (404): { "success": false, "message": "Permiso con ID 999 no encontrado" }
+DELETE {{baseUrl}}/api/endpointpermissions/25
+Authorization: {{tokenAdmin}}
+
+### ============================================================
+### CÓDIGOS DE RESPUESTA HTTP
+### ============================================================
+### 200 OK - Operación exitosa
+### 201 Created - Recurso creado exitosamente
+### 400 Bad Request - Datos de entrada inválidos o faltantes
+### 401 Unauthorized - No autenticado o token inválido
+### 403 Forbidden - Sin permisos para acceder al recurso
+### 404 Not Found - Recurso no encontrado
+### 409 Conflict - Conflicto (ej: duplicado)
+### 500 Internal Server Error - Error interno del servidor
+### ============================================================
+
+### ============================================================
+### ESTRUCTURA DE RESPUESTA ESTÁNDAR
+### ============================================================
+### Éxito:
+### {
+###     "success": true,
+###     "message": "Descripción del resultado",
+###     "data": { ... } // opcional
+### }
+###
+### Error:
+### {
+###     "success": false,
+###     "message": "Descripción del error",
+###     "errors": ["error1", "error2"] // opcional
+### }
+### ============================================================
