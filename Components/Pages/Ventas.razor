@@ -4,9 +4,9 @@
 @inject WEBAPP.Services.AuthState State
 @inject NavigationManager Nav
 
-<PageTitle>Ventas</PageTitle>
+<PageTitle>Gestión de Ventas</PageTitle>
 
-@if (!State.IsInRole("Admin", "Operador"))
+@if (!State.IsInRole("Admin", "Supervisor"))
 {
     <div class="alert alert-danger">No tienes permisos para acceder a esta sección.</div>
 }

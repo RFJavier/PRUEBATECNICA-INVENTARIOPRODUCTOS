@@ -1,0 +1,353 @@
+@page "/registrar-venta"
+@inject WEBAPP.Services.VentaService VentaService
+@inject WEBAPP.Services.ProductoService ProductoService
+@inject WEBAPP.Services.AuthState State
+@inject NavigationManager Nav
+
+<PageTitle>Registrar Venta</PageTitle>
+
+@if (!State.IsInRole("Admin", "Operador"))
+{
+    <div class="alert alert-danger">No tienes permisos para acceder a esta sección.</div>
+}
+else
+{
+    <div class="container-fluid">
+        <!-- Notificación Toast -->
+        @if (showNotification)
+        {
+            <div class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+                <div class="toast show @(notificationType == "success" ? "bg-success" : "bg-danger") text-white">
+                    <div class="toast-header @(notificationType == "success" ? "bg-success" : "bg-danger") text-white">
+                        <strong class="me-auto">@(notificationType == "success" ? "? Éxito" : "? Error")</strong>
+                        <button type="button" class="btn-close btn-close-white" @onclick="() => showNotification = false"></button>
+                    </div>
+                    <div class="toast-body">
+                        @notificationMessage
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="mb-0">?? Registrar Nueva Venta</h3>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-body">
+                    <!-- Datos de la venta -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha y Hora</label>
+                            <input class="form-control" type="datetime-local" @bind="formFecha" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Vendedor</label>
+                            <input class="form-control" value="@State.Username" readonly />
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <!-- Agregar productos -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Productos</h5>
+                        <button class="btn btn-success" @onclick="AddDetalle">
+                            <i class="bi bi-plus-lg"></i> Agregar Producto
+                        </button>
+                    </div>
+
+                    @if (formDetalles.Count == 0)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Agregue al menos un producto para registrar la venta.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th style="width:120px;">Cantidad</th>
+                                        <th style="width:140px;">Precio Unit.</th>
+                                        <th style="width:120px;">IVA (13%)</th>
+                                        <th style="width:140px;">Subtotal</th>
+                                        <th style="width:60px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < formDetalles.Count; i++)
+                                    {
+                                        var index = i;
+                                        var det = formDetalles[index];
+                                        <tr>
+                                            <td>
+                                                <select class="form-select" @bind="det.Idpro" @bind:after="() => OnProductoChanged(det)">
+                                                    <option value="0">-- Seleccione un producto --</option>
+                                                    @foreach (var p in productos)
+                                                    {
+                                                        <option value="@p.Id">@p.Nombre (@p.Codigo) - @p.Precio.ToString("C2")</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input class="form-control text-center" type="number" min="1" @bind="det.Cantidad" @bind:after="() => CalcularDetalle(det)" />
+                                            </td>
+                                            <td>
+                                                <input class="form-control" type="number" step="0.01" @bind="det.Precio" @bind:after="() => CalcularDetalle(det)" readonly />
+                                            </td>
+                                            <td class="text-end align-middle">@det.Iva.ToString("C2")</td>
+                                            <td class="text-end align-middle fw-bold text-primary">@det.Total.ToString("C2")</td>
+                                            <td class="text-center">
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveDetalle(index)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    <!-- Resumen de Totales -->
+                    <div class="card bg-light mt-4">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Resumen de la Venta</h6>
+                                    <p class="mb-1"><strong>Cantidad de productos:</strong> @formDetalles.Sum(d => d.Cantidad)</p>
+                                    <p class="mb-0"><strong>Líneas de detalle:</strong> @formDetalles.Count</p>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <p class="mb-1 fs-5"><strong>Subtotal:</strong> @CalcularSubtotal().ToString("C2")</p>
+                                    <p class="mb-1 fs-5"><strong>IVA (13%):</strong> @CalcularIvaTotal().ToString("C2")</p>
+                                    <hr />
+                                    <h3 class="text-success mb-0"><strong>Total:</strong> @CalcularTotalGeneral().ToString("C2")</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botón de registro -->
+                    <div class="d-grid gap-2 mt-4">
+                        <button class="btn btn-primary btn-lg" @onclick="GuardarVenta" disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            <i class="bi bi-check-circle me-2"></i> Registrar Venta
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historial reciente -->
+            @if (ventasRecientes.Count > 0)
+            {
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Mis Ventas Recientes (Hoy)</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Hora</th>
+                                    <th>Items</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var v in ventasRecientes.Take(5))
+                                {
+                                    <tr>
+                                        <td>#@v.Idventa</td>
+                                        <td>@v.Fecha.ToString("HH:mm")</td>
+                                        <td>@v.Detalles.Count productos</td>
+                                        <td class="text-end fw-bold">@v.Total.ToString("C2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private List<WEBAPP.Models.Producto> productos = new();
+    private List<WEBAPP.Models.VentaConDetalles> ventasRecientes = new();
+    private bool isLoading = true;
+
+    // Form state
+    private DateTime formFecha = DateTime.Now;
+    private List<DetalleForm> formDetalles = new();
+    private bool isSaving;
+
+    // Notification
+    private bool showNotification;
+    private string notificationMessage = string.Empty;
+    private string notificationType = "success";
+
+    private class DetalleForm
+    {
+        public int Idpro { get; set; }
+        public int Cantidad { get; set; } = 1;
+        public decimal Precio { get; set; }
+        public decimal Iva { get; set; }
+        public decimal Total { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadData();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            var productosResult = await ProductoService.GetAllAsync();
+            productos = productosResult.Data;
+
+            // Cargar ventas del día para el historial
+            var ventasResult = await VentaService.GetAllConDetallesAsync();
+            var hoy = DateTime.Today;
+            ventasRecientes = ventasResult.Data
+                .Where(v => v.Fecha.Date == hoy && v.Vendedor.Equals(State.Username, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(v => v.Fecha)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error al cargar datos: " + ex.Message, "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowNotification(string message, string type = "success")
+    {
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        _ = HideNotificationAfterDelay();
+    }
+
+    private async Task HideNotificationAfterDelay()
+    {
+        await Task.Delay(4000);
+        showNotification = false;
+        StateHasChanged();
+    }
+
+    private void AddDetalle()
+    {
+        formDetalles.Add(new DetalleForm());
+    }
+
+    private void RemoveDetalle(int index)
+    {
+        if (index >= 0 && index < formDetalles.Count)
+            formDetalles.RemoveAt(index);
+    }
+
+    private void OnProductoChanged(DetalleForm det)
+    {
+        var producto = productos.FirstOrDefault(p => p.Id == det.Idpro);
+        if (producto is not null)
+        {
+            det.Precio = producto.Precio;
+            CalcularDetalle(det);
+        }
+    }
+
+    private void CalcularDetalle(DetalleForm det)
+    {
+        var subtotal = det.Cantidad * det.Precio;
+        det.Iva = Math.Round(subtotal * 0.13m, 2);
+        det.Total = Math.Round(subtotal + det.Iva, 2);
+    }
+
+    private decimal CalcularSubtotal() => formDetalles.Sum(d => d.Cantidad * d.Precio);
+    private decimal CalcularIvaTotal() => formDetalles.Sum(d => d.Iva);
+    private decimal CalcularTotalGeneral() => formDetalles.Sum(d => d.Total);
+
+    private async Task GuardarVenta()
+    {
+        if (formDetalles.Count == 0 || formDetalles.All(d => d.Idpro == 0))
+        {
+            ShowNotification("Debe agregar al menos un producto válido.", "error");
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var request = new WEBAPP.Models.VentaRequest
+            {
+                Fecha = formFecha,
+                Vendedor = State.Username ?? "Operador",
+                Total = CalcularTotalGeneral(),
+                Detalles = formDetalles
+                    .Where(d => d.Idpro > 0)
+                    .Select(d => new WEBAPP.Models.DetalleVentaRequest
+                    {
+                        Fecha = formFecha,
+                        Idpro = d.Idpro,
+                        Cantidad = d.Cantidad,
+                        Precio = d.Precio,
+                        Iva = d.Iva,
+                        Total = d.Total
+                    }).ToList()
+            };
+
+            var (success, message, id) = await VentaService.CreateAsync(request);
+            if (success)
+            {
+                ShowNotification($"¡Venta registrada exitosamente! ID: {id}");
+                // Limpiar formulario
+                formFecha = DateTime.Now;
+                formDetalles = new();
+                // Recargar historial
+                await LoadData();
+            }
+            else
+            {
+                ShowNotification(message, "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error: " + ex.Message, "error");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

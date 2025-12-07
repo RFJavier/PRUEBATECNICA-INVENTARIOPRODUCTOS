@@ -35,6 +35,7 @@ namespace WEBAPP
             builder.Services.AddScoped<Services.RoleService>();
             builder.Services.AddScoped<Services.UserService>();
             builder.Services.AddScoped<Services.EndpointPermissionService>();
+            builder.Services.AddScoped<Services.ReporteService>();
 
             var app = builder.Build();
 

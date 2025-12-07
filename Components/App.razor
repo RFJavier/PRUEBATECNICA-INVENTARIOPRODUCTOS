@@ -15,6 +15,15 @@
 <body>
     <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
+    <script>
+        window.downloadFileFromBase64 = function (fileName, base64Data, mimeType) {
+            const linkSource = `data:${mimeType};base64,${base64Data}`;
+            const downloadLink = document.createElement("a");
+            downloadLink.href = linkSource;
+            downloadLink.download = fileName;
+            downloadLink.click();
+        };
+    </script>
 </body>
 
 </html>

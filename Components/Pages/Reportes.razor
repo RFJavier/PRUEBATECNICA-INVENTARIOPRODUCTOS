@@ -1,0 +1,260 @@
+@page "/reportes"
+@inject WEBAPP.Services.ReporteService ReporteService
+@inject WEBAPP.Services.AuthState State
+@inject IJSRuntime JS
+
+<PageTitle>Reportes de Ventas</PageTitle>
+
+@if (!State.IsInRole("Admin", "Supervisor"))
+{
+    <div class="alert alert-danger">No tienes permisos para acceder a esta sección.</div>
+}
+else
+{
+    <div class="container-fluid">
+        <!-- Notificación Toast -->
+        @if (showNotification)
+        {
+            <div class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+                <div class="toast show @(notificationType == "success" ? "bg-success" : "bg-danger") text-white">
+                    <div class="toast-header @(notificationType == "success" ? "bg-success" : "bg-danger") text-white">
+                        <strong class="me-auto">@(notificationType == "success" ? "? Éxito" : "? Error")</strong>
+                        <button type="button" class="btn-close btn-close-white" @onclick="() => showNotification = false"></button>
+                    </div>
+                    <div class="toast-body">
+                        @notificationMessage
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="mb-0">?? Reportes de Ventas</h3>
+        </div>
+
+        <!-- Filtros -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">Filtrar por Fecha</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha Inicio</label>
+                        <input type="date" class="form-control" @bind="fechaInicio" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha Fin</label>
+                        <input type="date" class="form-control" @bind="fechaFin" />
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary" @onclick="CargarInfo" disabled="@isLoading">
+                            <i class="bi bi-search"></i> Consultar
+                        </button>
+                        <button class="btn btn-outline-secondary ms-2" @onclick="LimpiarFiltros">
+                            <i class="bi bi-x"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen -->
+        @if (isLoading)
+        {
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </div>
+        }
+        else if (reporteInfo is not null)
+        {
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h2 class="mb-0">@reporteInfo.TotalVentas</h2>
+                            <small>Total de Ventas</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h2 class="mb-0">@reporteInfo.TotalMonto.ToString("C2")</h2>
+                            <small>Monto Total</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h2 class="mb-0">@reporteInfo.PromedioVenta.ToString("C2")</h2>
+                            <small>Promedio por Venta</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Descarga -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Descargar Reporte</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-grid">
+                                <button class="btn btn-success btn-lg" @onclick="DescargarExcel" disabled="@isDownloading">
+                                    @if (isDownloading && downloadType == "excel")
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="bi bi-file-earmark-excel me-2"></i> Descargar Excel
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-grid">
+                                <button class="btn btn-danger btn-lg" @onclick="DescargarPdf" disabled="@isDownloading">
+                                    @if (isDownloading && downloadType == "pdf")
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <i class="bi bi-file-earmark-pdf me-2"></i> Descargar PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Selecciona un rango de fechas y haz clic en "Consultar" para ver el resumen del reporte.
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private DateTime? fechaInicio;
+    private DateTime? fechaFin;
+    private WEBAPP.Models.ReporteVentasInfo? reporteInfo;
+    private bool isLoading;
+    private bool isDownloading;
+    private string downloadType = string.Empty;
+
+    // Notification
+    private bool showNotification;
+    private string notificationMessage = string.Empty;
+    private string notificationType = "success";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Cargar info inicial sin filtros
+            await CargarInfo();
+            StateHasChanged();
+        }
+    }
+
+    private void ShowNotification(string message, string type = "success")
+    {
+        notificationMessage = message;
+        notificationType = type;
+        showNotification = true;
+        _ = HideNotificationAfterDelay();
+    }
+
+    private async Task HideNotificationAfterDelay()
+    {
+        await Task.Delay(4000);
+        showNotification = false;
+        StateHasChanged();
+    }
+
+    private async Task CargarInfo()
+    {
+        isLoading = true;
+        try
+        {
+            var (success, message, data) = await ReporteService.GetReporteInfoAsync(fechaInicio, fechaFin);
+            if (success)
+            {
+                reporteInfo = data;
+            }
+            else
+            {
+                ShowNotification(message, "error");
+                reporteInfo = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error: " + ex.Message, "error");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LimpiarFiltros()
+    {
+        fechaInicio = null;
+        fechaFin = null;
+        reporteInfo = null;
+    }
+
+    private async Task DescargarExcel()
+    {
+        await DescargarReporte("excel");
+    }
+
+    private async Task DescargarPdf()
+    {
+        await DescargarReporte("pdf");
+    }
+
+    private async Task DescargarReporte(string tipo)
+    {
+        isDownloading = true;
+        downloadType = tipo;
+        try
+        {
+            var result = tipo == "excel" 
+                ? await ReporteService.DescargarExcelAsync(fechaInicio, fechaFin)
+                : await ReporteService.DescargarPdfAsync(fechaInicio, fechaFin);
+
+            if (result.Success && result.Data is not null)
+            {
+                // Descargar el archivo usando JS interop
+                var base64 = Convert.ToBase64String(result.Data);
+                var mimeType = tipo == "excel" 
+                    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+                    : "application/pdf";
+                
+                await JS.InvokeVoidAsync("downloadFileFromBase64", result.FileName, base64, mimeType);
+                ShowNotification(result.Message);
+            }
+            else
+            {
+                ShowNotification(result.Message, "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowNotification("Error: " + ex.Message, "error");
+        }
+        finally
+        {
+            isDownloading = false;
+            downloadType = string.Empty;
+        }
+    }
+}
