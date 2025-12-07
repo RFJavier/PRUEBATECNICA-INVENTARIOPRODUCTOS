@@ -1,6 +1,34 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+﻿<Router AppAssembly="typeof(Program).Assembly" OnNavigateAsync="HandleNavigateAsync">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    [Inject] WEBAPP.Services.AuthService Auth { get; set; } = default!;
+    [Inject] WEBAPP.Services.AuthState State { get; set; } = default!;
+    [Inject] NavigationManager Nav { get; set; } = default!;
+
+    private async Task HandleNavigateAsync(NavigationContext args)
+    {
+        // Allow navigating to login page
+        if (args.Path == string.Empty || args.Path.Equals("login", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        // If we already know we are not authenticated, redirect without JS interop
+        if (!State.IsAuthenticated)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        // Otherwise, verify token (after interactivity)
+        await Task.Yield();
+        var token = await Auth.GetTokenAsync();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Nav.NavigateTo("/");
+        }
+    }
+}
