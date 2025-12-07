@@ -43,12 +43,13 @@ namespace restapi.inventarios.Data.Repositories
             var tvp = new SqlParameter("@Detalles", BuildDetallesTvp(detalles)) { SqlDbType = SqlDbType.Structured, TypeName = "TipoDetalleVenta" };
             cmd.Parameters.Add(tvp);
 
-            var idventa = 0;
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            if (await reader.ReadAsync(ct))
-            {
-                idventa = Convert.ToInt32(reader["idventa"]);
-            }
+            // Parámetro OUTPUT para obtener el ID generado
+            var pIdVenta = new SqlParameter("@idventa", SqlDbType.Int) { Direction = ParameterDirection.Output };
+            cmd.Parameters.Add(pIdVenta);
+
+            await cmd.ExecuteNonQueryAsync(ct);
+            
+            var idventa = pIdVenta.Value is int i ? i : Convert.ToInt32(pIdVenta.Value);
             return idventa;
         }
 
