@@ -16,6 +16,7 @@ namespace restapi.inventarios.Data
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<UserRole> UserRoles => Set<UserRole>();
         public DbSet<Session> Sessions => Set<Session>();
+        public DbSet<EndpointPermission> EndpointPermissions => Set<EndpointPermission>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -118,6 +119,18 @@ namespace restapi.inventarios.Data
                 b.Property(s => s.ExpiresAt).HasColumnType("datetime2");
                 b.Property(s => s.RevokedAt).HasColumnType("datetime2");
                 b.HasOne(s => s.User).WithMany(u => u.Sessions).HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // EndpointPermissions
+            modelBuilder.Entity<EndpointPermission>(b =>
+            {
+                b.ToTable("EndpointPermissions");
+                b.HasKey(e => e.Id);
+                b.Property(e => e.Route).HasMaxLength(200).IsRequired();
+                b.Property(e => e.HttpMethod).HasMaxLength(10).IsRequired();
+                b.Property(e => e.AllowedRolesCsv).HasMaxLength(500).IsRequired(); // "*" para cualquiera
+                b.Property(e => e.IsEnabled).HasDefaultValue(true);
+                b.HasIndex(e => new { e.Route, e.HttpMethod }).IsUnique();
             });
         }
     }
