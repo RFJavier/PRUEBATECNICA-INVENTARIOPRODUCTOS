@@ -416,3 +416,10 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+.dockerignore
+.github/workflows/docker-publish.yml
+docker-compose.prod.yml
+docker-compose.yml
+DOCKER-DEPLOY.md
+Dockerfile
+.config/dotnet-tools.json
