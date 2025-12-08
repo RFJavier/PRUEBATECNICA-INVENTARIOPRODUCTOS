@@ -418,3 +418,6 @@ FodyWeavers.xsd
 *.msp
 docker-compose.yml
 restapi.inventarios.http
+.github/workflows/docker-publish.yml
+docker-compose.prod.yml
+DOCKER-DEPLOY.md
